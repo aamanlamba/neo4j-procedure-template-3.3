@@ -8,11 +8,13 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
+import java.util.ArrayList;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-
+import java.util.Iterator;
 import javax.swing.JFrame;
 
 import org.freehep.graphics2d.VectorGraphics;
@@ -33,9 +35,11 @@ import org.neo4j.procedure.UserFunction;
 import com.aaman.neo4j.MovieVertex;
 import com.aaman.neo4j.NodeInfo;
 import com.aaman.neo4j.PersonVertex;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import edu.uci.ics.jung.graph.util.EdgeType;
 import edu.uci.ics.jung.algorithms.layout.GraphElementAccessor;
 import edu.uci.ics.jung.algorithms.layout.ISOMLayout;
 import edu.uci.ics.jung.graph.DirectedSparseGraph;
@@ -45,7 +49,7 @@ import edu.uci.ics.jung.visualization.control.ModalGraphMouse;
 import edu.uci.ics.jung.visualization.decorators.ToStringLabeller;
 
 /**
- * This is an com.aaman.neo4j how you can create a simple user-defined function for Neo4j.
+ * This is an example how you can create a simple user-defined function for Neo4j.
  */
 public class Join
 {
@@ -87,7 +91,102 @@ public class Join
        return JSONResultStr;
     }
     
+    
     @UserFunction
+    @Description("com.aaman.neo4j.getJungJSONFromPaths(nodes,rels) - return JUNG-rendered JSON of query results")
+    public String getJungJSONFromPaths(
+            @Name("nodes") List<Node> nodes,
+            @Name("rels") List<Relationship> rels) {
+    		  String JSONResultStr="";
+			try {
+				JSONResultStr = generateJSONGraphFromPaths(nodes,rels);
+			} catch (IOException e) {
+				return e.getMessage();
+			} 
+
+       return JSONResultStr;
+    }
+    
+    private String generateJSONGraphFromPaths(List<Node> nodes, List<Relationship> rels) throws IOException {
+    		
+    		// convert Nodes to RootNodes
+    		Iterator<Node> itNode = nodes.iterator();
+    		List<RootNode> rtNodeList = new ArrayList<>();
+    		while(itNode.hasNext()) {
+    			rtNodeList.add(new RootNode( itNode.next()));
+    		}
+    		
+    		return renderJSONGraphFromPaths(loadJungGraphFromPaths(rtNodeList,rels));
+    	}
+
+	private String renderJSONGraphFromPaths(DirectedSparseGraph<RootNode, Relationship> g) throws JsonProcessingException {
+		String JSONGraph="";
+		 ObjectMapper objectMapper = new ObjectMapper();
+			     objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+			        objectMapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+
+				ISOMLayout<RootNode,Relationship> layout = new ISOMLayout<>(g);
+				Dimension viewerDim = new Dimension(800,800);
+				Rectangle viewerRect = new Rectangle(viewerDim);
+			    VisualizationViewer<RootNode,Relationship> vv =
+			      new VisualizationViewer<>(layout, viewerDim);
+			    GraphElementAccessor<RootNode,Relationship> pickSupport = 
+			            vv.getPickSupport();
+			        Collection<RootNode> vertices = 
+			            pickSupport.getVertices(layout, viewerRect);
+			       // vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller());
+			        for (RootNode vertex: vertices) {
+		        			//print JSON version of vertex
+		            		JSONGraph += objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(vertex.nNode);
+			        }
+			        vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller());
+			        // The following code adds capability for mouse picking of vertices/edges. Vertices can even be moved!
+				    final DefaultModalGraphMouse<String,Number> graphMouse = new DefaultModalGraphMouse<>();
+				    vv.setGraphMouse(graphMouse);
+				    graphMouse.setMode(ModalGraphMouse.Mode.PICKING);
+				 	      
+					  JFrame frame = new JFrame();
+					  frame.getContentPane().add(vv);
+					  frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+					  frame.pack();
+					  frame.setVisible(true);
+					
+			        //print vertices collection as JSON array
+			       // String verticesJSON = objectMapper.writeValueAsString(vertices);
+			      //  JSONGraph += verticesJSON;
+			        return JSONGraph;
+	}
+
+	private DirectedSparseGraph<RootNode, Relationship> loadJungGraphFromPaths(List<RootNode> nodes,
+			List<Relationship> rels) {
+		DirectedSparseGraph<RootNode,Relationship> graph2 = new DirectedSparseGraph<>();
+		
+		// iterate through Relationships and load graph
+		Iterator<Relationship> itrel = rels.iterator();
+		while(itrel.hasNext()) {
+			Relationship rel = itrel.next();
+			//get startNode and endNode and add to graph
+			RootNode startNode = new RootNode(rel.getStartNode());
+			RootNode endNode = new RootNode(rel.getEndNode());
+	
+			graph2.addVertex(startNode);
+			graph2.addVertex(endNode);
+			//add relationship to graph as edge
+
+			graph2.addEdge(rel,startNode,endNode,EdgeType.DIRECTED);
+		}
+		
+		// then iterate through nodes and it should add only 'orphan' nodes
+		Iterator<RootNode> itnode = nodes.iterator();
+		while(itnode.hasNext()) {
+			RootNode node = itnode.next();
+			graph2.addVertex(node);
+		}
+ 
+		return graph2;
+	}
+
+	@UserFunction
     @Description("com.aaman.neo4j.getJungSVG(query) - return JUNG-rendered SVG of query results")
     public String getJungSVG(
             @Name("query") String query) {
