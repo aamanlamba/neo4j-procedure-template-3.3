@@ -17,11 +17,14 @@ public class RootNode implements NodeInfo{
 	protected String id;
 	protected String type;
 	protected Map<String,Object> nNode;
+	protected double posX,posY;
 	protected RootNode() {
 		name="";
 		id="";
 		type="";
 		nNode=null;
+		posX=0.0;
+		posY=0.0;
 	}
 	protected RootNode(Node n) {
 		
@@ -44,8 +47,22 @@ public class RootNode implements NodeInfo{
 		}
 		this.id = ((Long)n.getId()).toString();
 		nNode = n.getAllProperties();
+		posX=0.0;
+		posY=0.0;
 	}
 	
+	public double getPosX() {
+		return posX;
+	}
+	public void setPosX(double posX) {
+		this.posX = posX;
+	}
+	public double getPosY() {
+		return posY;
+	}
+	public void setPosY(double posY) {
+		this.posY = posY;
+	}
 	protected RootNode(String name,String id,String type) {
 		this.name=name;
 		this.id=id;
