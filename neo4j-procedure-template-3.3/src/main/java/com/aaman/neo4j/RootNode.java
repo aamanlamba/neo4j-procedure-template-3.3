@@ -45,6 +45,7 @@ public class RootNode implements NodeInfo{
 			this.type = lab.name();
 			break;
 		}
+		
 		this.id = ((Long)n.getId()).toString();
 		nNode = n.getAllProperties();
 		posX=0.0;
