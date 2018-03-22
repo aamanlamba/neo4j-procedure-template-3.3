@@ -12,12 +12,25 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
+@JsonPropertyOrder({"name", "id", "type","properties","posX","posY"})
 public class RootNode implements NodeInfo{
+	
+	@JsonProperty("name")
 	protected String name;
+	@JsonProperty("id")
 	protected String id;
+	@JsonProperty("type")
 	protected String type;
+	@JsonProperty("properties")
 	protected Map<String,Object> nNode;
-	protected double posX,posY;
+	@JsonProperty("posX")
+	protected double posX;
+	@JsonProperty("posY")
+	protected double posY;
+	
 	protected RootNode() {
 		name="";
 		id="";
@@ -47,9 +60,9 @@ public class RootNode implements NodeInfo{
 		}
 		
 		this.id = ((Long)n.getId()).toString();
-		nNode = n.getAllProperties();
-		posX=0.0;
-		posY=0.0;
+		this.nNode = n.getAllProperties();
+		this.posX=0.0;
+		this.posY=0.0;
 	}
 	
 	public double getPosX() {
@@ -76,14 +89,20 @@ public class RootNode implements NodeInfo{
 	
 	
 	
-	protected void setName(String name) {
-		this.name = name;
-	}
-	protected String getID() {
+	public String getId() {
 		return id;
 	}
-	protected void setID(String id) {
+	public void setId(String id) {
 		this.id = id;
+	}
+	public Map<String, Object> getnNode() {
+		return nNode;
+	}
+	public void setnNode(Map<String, Object> nNode) {
+		this.nNode = nNode;
+	}
+	protected void setName(String name) {
+		this.name = name;
 	}
 	public String getType() {
 		return type;

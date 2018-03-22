@@ -9,7 +9,7 @@ import org.neo4j.driver.v1.GraphDatabase;
 import org.neo4j.driver.v1.Session;
 import org.neo4j.harness.junit.Neo4jRule;
 
-import com.aaman.neo4j.Join;
+import com.aaman.neo4j.GetJung;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.junit.Assert.*;
@@ -21,7 +21,7 @@ public class JoinTest
     public Neo4jRule neo4j = new Neo4jRule()
 
             // This is the function we want to test
-            .withFunction( Join.class );
+            .withFunction( GetJung.class );
 
     @Test
     public void shouldAllowIndexingAndFindingANode() throws Throwable
