@@ -25,13 +25,15 @@ public class RootRelationship {
 		type="";
 		nRel = null;
 	}
-	protected RootRelationship(Relationship rel) {
+	protected RootRelationship(Relationship rel, String props) {
 
 		
 		this.name = rel.getType().toString();
 		this.type = rel.getType().toString();
 		this.id = ((Long)rel.getId()).toString();
-		nRel = rel.getAllProperties();
+		if(props=="yes")
+			nRel = rel.getAllProperties();
+		else nRel = null;
 	}
 	protected RootRelationship(String name,String id,String type) {
 		this.name=name;

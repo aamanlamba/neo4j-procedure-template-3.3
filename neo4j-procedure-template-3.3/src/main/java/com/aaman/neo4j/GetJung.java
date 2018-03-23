@@ -8,8 +8,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -17,9 +19,11 @@ import java.util.ArrayList;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.Iterator;
@@ -81,69 +85,44 @@ public class GetJung
 	@Context
 	public Log log;
 
-	@UserFunction
-	@Description("com.aaman.neo4j.join(['s1','s2',...], delimiter) - join the given strings with the given delimiter.")
-	public String join(
-			@Name("strings") List<String> strings,
-			@Name(value = "delimiter", defaultValue = ",") String delimiter) {
-		if (strings == null || delimiter == null) {
-			return null;
-		}
-		return String.join(delimiter, strings);
-	}
-
-	/**
-	 *  Neo4J UserFunction to get JUNG Graph in JSON format with x,y vertices of ISOMLayout
-	 * @param nodes
-	 * @param rels
-	 * @return String of JUNG Graph in JSON Format
-	 * with [] as nodesColl, [] as relsColl
-	 * match p=(person:Person {name:"Keanu Reeves"} )-[:ACTED_IN]->(movie:Movie)
-	 * with nodes(p) as pNodes, rels(p) as rNodes,nodesColl,relsColl
-	* unwind pNodes as pN
-	* unwind rNodes as rN
-* with nodesColl + collect(distinct pN) as nodesColl, relsColl + collect(distinct rN) as relsColl
-
-* return com.aaman.neo4j.getJungJSONFromPaths(nodesColl,relsColl,"/Users/aamanlamba/Downloads/Output.svg")
-	 */
-	@UserFunction
-	@Description("com.aaman.neo4j.getJungJSONFromPaths(nodes,rels) - return JUNG-rendered JSON of query results")
-	public String getJungJSONFromPaths(
-			@Name("nodes") List<Node> nodes,
-			@Name("rels") List<Relationship> rels) {
-		String JSONResultStr="";
-		try {
-			JSONResultStr = generateJSONGraphFromPaths(nodes,rels);
-		} catch (IOException e) {
-			return e.getMessage();
-		} 
-
-		return JSONResultStr;
-	}
-
 	
 	/**
-	 * 
-	 * @param nodes
-	 * @param rels
-	 * @param svgPath
-	 * @return String of SVG Graph 
+	 * pass properties to Jung function
+	 * {storeProps:"yes",filePath:"/Users/aamanlamba/",returnType:"json/svg",returnAs:"raw/file"}
 	 */
+	private static Properties props;
+	
 	@UserFunction
-	@Description("com.aaman.neo4j.getJungSVGFromPaths(nodes,rels,svgPath) - return JUNG-rendered SVG of query results")
-	public String getJungSVGFromPaths(
-			@Name("nodes") List<Node> nodes,
-			@Name("rels") List<Relationship> rels,
-			@Name("svgPath") String svgPath) {
-		String SVGResultStr="";
-		try {
-			SVGResultStr = generateSVGGraphFromPaths(nodes,rels,svgPath);
-		} catch (IOException e) {
-			return e.getMessage();
-		} 
-
-		return SVGResultStr;
+	@Description("com.aaman.neo4j.getJungFromPaths(nodes,rels,props) - {storeProps:\"yes\",filePath:\"/Users/aamanlamba/\",returnType:\"json/svg\",returnAs:\"raw/file\"}")
+	public String getJungFromPaths(@Name("nodes") List<Node> nodes,
+									@Name("rels") List<Relationship> rels,
+									@Name("props") Map<String,Object> props) {
+		//clear and load props
+		GetJung.props.clear();
+		GetJung.props.putAll(props);
+		String resultStr = "";
+		
+		switch(GetJung.props.getProperty("returnType")) {
+			case "json":
+				try {
+					resultStr = generateJSONGraphFromPaths(nodes,rels);
+				} catch (IOException e) {
+					return e.getMessage();
+				}
+				break;
+			case "svg":
+				try {
+					resultStr = generateSVGGraphFromPaths(nodes,rels);
+				} catch (IOException e) {
+					return e.getMessage();
+				}
+				break;
+			default:
+				break;
+		}
+		return resultStr;
 	}
+	
 
 	/**
 	 * 
@@ -154,143 +133,45 @@ public class GetJung
 	 */
 	private String generateJSONGraphFromPaths(List<Node> nodes, List<Relationship> rels) throws IOException {
 
+		String jsonFilePath = GetJung.props.getProperty("filePath");
+		jsonFilePath += "/" + UUID.randomUUID().toString()+".json";
+		
 		// convert Nodes to RootNodes
 		Iterator<Node> itNode = nodes.iterator();
 		List<RootNode> rtNodeList = new ArrayList<>();
 		while(itNode.hasNext()) {
-			rtNodeList.add(new RootNode( itNode.next()));
+			rtNodeList.add(new RootNode( itNode.next(),
+					GetJung.props.getProperty("storeProps")));
 		}
 	
-		return renderJSONGraphFromPaths(loadJungGraphFromPaths(rtNodeList,rels));
+		return renderJSONGraphFromPaths(loadJungGraphFromPaths(rtNodeList,rels),jsonFilePath);
 	}
 
 	/**
 	 * 
 	 * @param nodes
 	 * @param rels
-	 * @param svgPath
+
 	 * @return
 	 * @throws IOException
 	 */
-	private String generateSVGGraphFromPaths(List<Node> nodes, List<Relationship> rels, String svgPath) throws IOException {
+	private String generateSVGGraphFromPaths(List<Node> nodes, List<Relationship> rels) throws IOException {
 
+		String svgFilePath = GetJung.props.getProperty("filePath");
+		svgFilePath += "/" + UUID.randomUUID().toString()+".svg";
+		
 		// convert Nodes to RootNodes
 		Iterator<Node> itNode = nodes.iterator();
 		List<RootNode> rtNodeList = new ArrayList<>();
 		while(itNode.hasNext()) {
-			rtNodeList.add(new RootNode( itNode.next()));
+			rtNodeList.add(new RootNode( itNode.next(),
+					GetJung.props.getProperty("storeProps")));
 		}
 		
 		
-		return renderSVGGraphFromPaths(loadJungGraphFromPaths(rtNodeList,rels),svgPath);
+		return renderSVGGraphFromPaths(loadJungGraphFromPaths(rtNodeList,rels),svgFilePath);
 	}
 
-	/**
-	 * 
-	 * @param nodes
-	 * @param rels
-	 * @param svgPath
-	 * @return String of SVG Graph 
-	 */
-	@UserFunction
-	@Description("com.aaman.neo4j.getJungSVGFromPathsTest(nodes,rels,svgPath) - return JUNG-rendered SVG of query results")
-	public String getJungSVGFromPathsTest(
-			@Name("nodes") List<Node> nodes,
-			@Name("rels") List<Relationship> rels,
-			@Name("svgPath") String svgPath) {
-		String SVGResultStr="";
-		try {
-			SVGResultStr = renderSVGGraphFromPathsTest(svgPath);
-		} catch (IOException e) {
-			return e.getMessage();
-		} 
-
-		return SVGResultStr;
-	}
-	/**
-	 * Test version of renderSVGGraph
-	 * 
-	 */
-	/**
-	 *  Function to return SVG as a String from JUNG graph
-	 * @param DirectedSparseGraph<RootNode, RootRelationship> g
-	 * @return String
-	 * @throws IOException
-	 */
-	private String renderSVGGraphFromPathsTest( String svgPath) throws IOException {
-		DirectedSparseGraph<String,String> g = new DirectedSparseGraph<>();
-		String svgResult="";
-		 g.addVertex("Vertex1");
-		    g.addVertex("Vertex2");
-		    g.addVertex("Vertex3");
-		    g.addEdge("Edge1", "Vertex1", "Vertex2");
-		    g.addEdge("Edge2", "Vertex1", "Vertex3");
-		    g.addEdge("Edge3", "Vertex3", "Vertex1");
-		
-		Dimension viewerDim = new Dimension(800,800);
-		Rectangle viewerRect = new Rectangle(viewerDim);
-		//VisualizationViewer<String,String> vv =
-		//		new VisualizationViewer<>(layout, viewerDim);
-	    VisualizationImageServer vs =
-	    	      new VisualizationImageServer(
-	    	        new ISOMLayout(g), viewerDim);
-		GraphElementAccessor<String,String> pickSupport = 
-				vs.getPickSupport();
-		vs.getRenderContext().setVertexLabelTransformer(new ToStringLabeller());
-		vs.setBackground(Color.LIGHT_GRAY);
-		// create svg from Visualization
-		Properties p = new Properties(); 
-		p.setProperty("PageSize","A5"); 
-		//svgResult= vv.toString();
-		String svgURI = svgPath;
-		File svgOutput = new File(svgURI);
-		if(svgOutput.exists())
-			svgOutput.delete();
-		//write to the file for reference for now
-		VectorGraphics vg = new SVGGraphics2D(svgOutput, viewerDim);
-		vg.setProperties(p); 
-		vg.setBackground(Color.YELLOW);
-
-		vg.startExport(); 
-		vs.printAll(vg);
-		//vv.print(vg); 
-		vg.endExport();
-	 	     //Display visualization for reference for now
-		  JFrame frame = new JFrame();
-		  frame.getContentPane().add(vs);
-		  frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-		  frame.pack();
-		  frame.setVisible(true);
-	/*	
-		//ugly way of getting the svg into a string - from the file
-		FileInputStream fis = new FileInputStream(svgOutput);
-		try( BufferedReader br =
-				new BufferedReader( new InputStreamReader(fis, "UTF-8" )))
-		{
-			StringBuilder sb = new StringBuilder();
-			String line;
-			while(( line = br.readLine()) != null ) {
-				sb.append( line );
-				sb.append( '\n' );
-			}
-			svgResult= sb.toString();
-		}
-	*/
-		
-		//write the svg to a ByteOutputStream and then to the String
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		VectorGraphics vg2 = new SVGGraphics2D(bos,viewerDim);
-		vg2.setProperties(p);
-		vg2.setBackground(Color.YELLOW);
-		vg2.startExport();
-		vs.print(vg2);
-		vg2.endExport();
-		svgResult = new String(bos.toByteArray(), "UTF-8");
-	
-	
-		return svgResult;   
-	}
-	
 	/**
 	 *  Function to create a JUNG DirectedSparseGraph from a collection of Neo4j Nodes & Relationships
 	 * @param nodes
@@ -307,15 +188,18 @@ public class GetJung
 		while(itrel.hasNext()) {
 			Relationship rel = itrel.next();
 			//get startNode and endNode and add to graph
-			RootNode startNode = new RootNode(rel.getStartNode());
-			RootNode endNode = new RootNode(rel.getEndNode());
+			RootNode startNode = new RootNode(rel.getStartNode(),
+					GetJung.props.getProperty("storeProps"));
+			RootNode endNode = new RootNode(rel.getEndNode(),
+					GetJung.props.getProperty("storeProps"));
 			
 			graph2.addVertex(startNode);
 			graph2.addVertex(endNode);
 			//add relationship to graph as edge
 			// convert Relationships to RootRelationships
 	
-			RootRelationship rtRel = new RootRelationship( rel) ;
+			RootRelationship rtRel = new RootRelationship( rel,
+					GetJung.props.getProperty("storeProps")) ;
 			graph2.addEdge(rtRel,startNode,endNode);
 		}
 
@@ -334,8 +218,10 @@ public class GetJung
 	 * @param DirectedSparseGraph<RootNode, RootRelationship> g
 	 * @return String
 	 * @throws JsonProcessingException
+	 * @throws FileNotFoundException 
 	 */
-	private String renderJSONGraphFromPaths(DirectedSparseGraph<RootNode, RootRelationship> g) throws JsonProcessingException {
+	private String renderJSONGraphFromPaths(DirectedSparseGraph<RootNode, RootRelationship> g,
+			String jsonURI) throws JsonProcessingException, FileNotFoundException {
 		String JSONGraph="";
 		ObjectMapper objectMapper = new ObjectMapper();
 		objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
@@ -360,9 +246,19 @@ public class GetJung
 			vertex.posY = layout.getY(vertex);
 			JSONGraph += objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(vertex);
 		}
+		try(PrintWriter jsonFile = new PrintWriter(jsonURI)){
+			jsonFile.write(JSONGraph);
+		}
+		if(GetJung.props.getProperty("returnAs")=="file")
+			return jsonURI;
 		return JSONGraph;
 	}
 	
+	/**
+	 * Function to remove duplicate nodes from vertices collection
+	 * @param vertices
+	 * @return
+	 */
 	private Collection<RootNode> getDedupVertices(Collection<RootNode> vertices) {
 		Collection<RootNode> dedupVertices = Collections.emptyList();
 		dedupVertices = vertices.stream().distinct().collect(Collectors.toList());;		
@@ -407,31 +303,7 @@ public class GetJung
 		
 		ByteArrayInputStream bis =  new ByteArrayInputStream(FileUtils.readFileToByteArray(svgOutput));
 		svgResult  = IOUtils.toString(bis,StandardCharsets.UTF_8);
-		/*//ugly way of getting the svg into a string - from the file - this introduces newlines
-		FileInputStream fis = new FileInputStream(svgOutput);
-		try( BufferedReader br =
-				new BufferedReader( new InputStreamReader(fis, "UTF-8" )))
-		{
-			StringBuilder sb = new StringBuilder();
-			String line;
-			while(( line = br.readLine()) != null ) {
-				sb.append( line );
-				
-			}
-			svgResult= sb.toString();
-		}
-		//write the svg to a ByteOutputStream and then to the String
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		VectorGraphics vg2 = new SVGGraphics2D(bos,viewerDim);
-		vg2.setProperties(p);
-		vg2.setBackground(Color.YELLOW);
-		vg2.startExport();
-		vs.print(vg2);
-		vg2.endExport();
-		svgResult = new String(bos.toByteArray(), "UTF-8");
-		
-*/
-	  
+	
 	/*
 		// The following code adds capability for mouse picking of vertices/edges. Vertices can even be moved!
 	    final DefaultModalGraphMouse<String,Number> graphMouse = new DefaultModalGraphMouse<>();
@@ -443,18 +315,10 @@ public class GetJung
 		  frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		  frame.pack();
 		  frame.setVisible(true);
-		
-		//write the svg to a ByteOutputStream and then to the String
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		VectorGraphics vg2 = new SVGGraphics2D(bos,viewerDim);
-		vg2.setProperties(p);
-		vg2.setBackground(Color.YELLOW);
-		vg2.startExport();
-		vv.print(vg2);
-		vg2.endExport();
-		svgResult = new String(bos.toByteArray(), "UTF-8");
 	*/
-	
+		if(GetJung.props.getProperty("returnAs")=="file")
+			return svgPath;
+
 		return svgResult;   
 	}
 

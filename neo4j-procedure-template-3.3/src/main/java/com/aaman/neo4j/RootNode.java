@@ -39,7 +39,7 @@ public class RootNode implements NodeInfo{
 		posX=0.0;
 		posY=0.0;
 	}
-	protected RootNode(Node n) {
+	protected RootNode(Node n, String storeProps) {
 		
 		
 		if(n.hasProperty("name"))
@@ -60,7 +60,10 @@ public class RootNode implements NodeInfo{
 		}
 		
 		this.id = ((Long)n.getId()).toString();
-		this.nNode = n.getAllProperties();
+		if(storeProps=="yes")
+			this.nNode = n.getAllProperties();
+		else
+			this.nNode = null;
 		this.posX=0.0;
 		this.posY=0.0;
 	}
